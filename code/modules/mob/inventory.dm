@@ -669,9 +669,9 @@
 //This is for multi-handed mobs, such as a human with a third limb installed
 //This is a very rare proc to call (besides admin fuckery) so
 //any cost it has isn't a worry
-/mob/proc/change_number_of_hands(amt)
+/mob/proc/change_number_of_hands(amt, dismember)
 	if(amt < held_items.len)
-		for(var/i in held_items.len to amt step -1)
+		for(var/i in held_items.len to amt + 1 step -1)
 			dropItemToGround(held_items[i])
 	held_items.len = amt
 

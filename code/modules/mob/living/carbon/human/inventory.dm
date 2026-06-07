@@ -406,17 +406,21 @@
 	stored.attack_hand(src) // take out thing from item in storage slot
 	return
 
-/mob/living/carbon/human/change_number_of_hands(amt)
+/mob/living/carbon/human/change_number_of_hands(amt, dismember)
 	var/old_limbs = held_items.len
 	if(amt < old_limbs)
-		for(var/i in hand_bodyparts.len to amt step -1)
+		for(var/i = hand_bodyparts.len; i >= amt + 1; i--)
 			var/obj/item/bodypart/BP = hand_bodyparts[i]
-			BP.dismember()
+			if(dismember)
+				BP.dismember()
+			else
+				BP.drop_limb(special = TRUE, move_to_floor = FALSE)
+				qdel(BP)
 			hand_bodyparts[i] = null
 		hand_bodyparts.len = amt
 	else if(amt > old_limbs)
 		hand_bodyparts.len = amt
-		for(var/i in old_limbs + 1 to amt)
+		for(var/i = old_limbs + 1; i <= amt; i++)
 			var/obj/item/bodypart/new_bodypart
 			if(IS_RIGHT_INDEX(i))
 				new_bodypart = newBodyPart(BODY_ZONE_R_ARM)
