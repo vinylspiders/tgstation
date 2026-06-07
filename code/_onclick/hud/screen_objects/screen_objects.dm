@@ -994,7 +994,7 @@ INITIALIZE_IMMEDIATE(/atom/movable/screen) // I hate this place
 			LAZYSET(animated_zones, part_zone, TRUE)
 		else
 			LAZYREMOVE(animated_zones, part_zone)
-		limbs[part_zone]?.icon_state = "[part_zone][icon_key]"
+		limbs[part_zone].icon_state = "[part_zone][icon_key]"
 	// time to re-sync animations, something changed
 	if(animated_zones ~! current_animated)
 		for(var/animated_zone in animated_zones)
