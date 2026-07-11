@@ -139,8 +139,7 @@
 
 /datum/bodypart_overlay/simple/golem_overlay/Destroy(force)
 	var/obj/item/bodypart/referenced_bodypart = attached_bodypart?.resolve()
-	if(referenced_bodypart)
-		referenced_bodypart.remove_bodypart_overlay(src)
+	referenced_bodypart?.remove_bodypart_overlay(src)
 	return ..()
 
 /// Freezes hunger for the duration
