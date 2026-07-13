@@ -456,16 +456,10 @@ function CharacterSection(props: CharacterSectionsProps) {
       placement="bottom-end"
       content={
         <Box
-          // Dumb way to copy dropdown styling but it works I guess
-          style={{
-            boxShadow: 'var(--dropdown-menu-blur)',
-            backgroundColor: 'var(--dropdown-menu-background)',
-            border: 'var(--dropdown-menu-border)',
-            borderRadius: 'var(--dropdown-menu-border-radius)',
-            opacity: dragging === -1 ? 1 : 0,
-            pointerEvents: dragging === -1 ? 'auto' : 'none',
-            transition: 'opacity 0.35s ease-out',
-          }}
+          className={classes([
+            'PreferencesMenu__Jobs__characterMenu',
+            dragging !== -1 && 'PreferencesMenu__Jobs__characterMenu--hidden',
+          ])}
           width="75%"
         >
           <Stack vertical p={1}>
