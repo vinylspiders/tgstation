@@ -439,12 +439,13 @@ function JoblessRoleDropdown(props) {
 }
 
 type CharacterSectionsProps = {
+  dragging: number;
   setDragging: (dragging: number) => void;
   setHoveringOver: (hoveringOver: string) => void;
 };
 
 function CharacterSection(props: CharacterSectionsProps) {
-  const { setDragging, setHoveringOver } = props;
+  const { dragging, setDragging, setHoveringOver } = props;
   const { data } = useBackend<PreferencesMenuData>();
   const { character_profiles } = data;
 
@@ -461,6 +462,9 @@ function CharacterSection(props: CharacterSectionsProps) {
             backgroundColor: 'var(--dropdown-menu-background)',
             border: 'var(--dropdown-menu-border)',
             borderRadius: 'var(--dropdown-menu-border-radius)',
+            opacity: dragging === -1 ? 1 : 0,
+            pointerEvents: dragging === -1 ? 'auto' : 'none',
+            transition: 'opacity 0.35s ease-out',
           }}
           width="75%"
         >
@@ -478,7 +482,11 @@ function CharacterSection(props: CharacterSectionsProps) {
                       <Button
                         draggable
                         color="transparent"
-                        onDragStart={() => setDragging(index)}
+                        onDragStart={() => {
+                          // Deferred so the browser captures the drag image
+                          // before the popup goes invisible
+                          setTimeout(() => setDragging(index), 0);
+                        }}
                         onDragEnd={() => {
                           setDragging(-1);
                           setHoveringOver('');
@@ -514,6 +522,7 @@ export function JobsPage() {
       <Stack>
         <Stack.Item grow>
           <CharacterSection
+            dragging={dragging}
             setDragging={setDragging}
             setHoveringOver={setHoveringOver}
           />
