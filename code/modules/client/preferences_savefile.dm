@@ -347,8 +347,8 @@ SAVEFILE UPDATING/VERSIONING - 'Simplified', or rather, more coder-friendly ~Car
 
 	var/tree_key = "character[slot]"
 	var/list/save_data = savefile.get_entry(tree_key)
-	if(isnull(save_data))
-		for (var/datum/preference/preference as anything in get_preferences_in_priority_order())
+	if(isnull(save_data)) // This is the case where we have a new character slot being switched to
+		for (var/datum/preference/preference as anything in get_preferences_in_priority_order()) // clear the cache in this case
 			if (preference.savefile_identifier != PREFERENCE_CHARACTER)
 				continue
 			value_cache -= preference.type
