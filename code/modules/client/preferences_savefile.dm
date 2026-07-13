@@ -357,6 +357,7 @@ SAVEFILE UPDATING/VERSIONING - 'Simplified', or rather, more coder-friendly ~Car
 	var/data_validity_integer = check_savedata_version(save_data)
 	if(IS_DATA_OBSOLETE(data_validity_integer)) //fatal, can't load any data
 		default_slot = original_default_slot
+		savefile.set_entry("default_slot", original_default_slot)
 		return FALSE
 
 	// Read everything into cache
