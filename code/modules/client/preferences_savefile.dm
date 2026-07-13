@@ -352,8 +352,6 @@ SAVEFILE UPDATING/VERSIONING - 'Simplified', or rather, more coder-friendly ~Car
 			if (preference.savefile_identifier != PREFERENCE_CHARACTER)
 				continue
 			value_cache -= preference.type
-		default_slot = original_default_slot
-		savefile.set_entry("default_slot", original_default_slot)
 		return FALSE
 
 	var/data_validity_integer = check_savedata_version(save_data)
