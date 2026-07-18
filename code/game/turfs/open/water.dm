@@ -254,6 +254,10 @@
 	. = ..()
 	if(!(flags_1 & INITIALIZED_1))
 		return
+	// If arrived hasn't finished its own Initialize() yet (e.g. during its own creation during mapload), on_atom_inited() will call enter_hot_spring() for it once
+	// Calling it here too would register dip_in/dip_out twice on the same movable.
+	if(!(arrived.flags_1 & INITIALIZED_1))
+		return
 	enter_hot_spring(arrived)
 
 /turf/open/water/hot_spring/on_atom_inited(datum/source, atom/movable/movable)
