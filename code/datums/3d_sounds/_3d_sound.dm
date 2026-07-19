@@ -119,7 +119,7 @@
 	PROTECTED_PROC(TRUE)
 
 	if(!(new_listener in listeners))
-		// If the listener is the sound's parent, COMSIG_QDELETING/COMSIG_MOVABLE_MOVED are already registeredin New()
+		// If the listener is the sound's parent, COMSIG_QDELETING/COMSIG_MOVABLE_MOVED are already registered in New()
 		if(new_listener != parent)
 			RegisterSignal(new_listener, COMSIG_QDELETING, PROC_REF(listener_deleted))
 
