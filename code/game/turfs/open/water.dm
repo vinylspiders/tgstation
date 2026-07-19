@@ -254,9 +254,7 @@
 	. = ..()
 	if(!(flags_1 & INITIALIZED_1))
 		return
-	// If arrived hasn't finished its own Initialize() yet (e.g. during its own creation during mapload), on_atom_inited() will call enter_hot_spring() for it once
-	// Calling it here too would register dip_in/dip_out twice on the same movable.
-	if(!(arrived.flags_1 & INITIALIZED_1))
+	if(!(arrived.flags_1 & INITIALIZED_1)) // If arrived hasn't finished its own Initialize() yet (e.g. during its own creation during mapload), on_atom_inited() will already call enter_hot_spring() for it once
 		return
 	enter_hot_spring(arrived)
 
