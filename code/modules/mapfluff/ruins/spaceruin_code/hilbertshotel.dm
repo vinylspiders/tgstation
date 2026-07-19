@@ -301,15 +301,37 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 	icon_state = "hoteldoor"
 	explosive_resistance = INFINITY
 	var/obj/item/hilbertshotel/parentSphere
+	/// Mobs currently peeking through this door - needs cleanup if this turf changes type while they're still registered to it.
+	var/list/mob/peeking_users
 
 /turf/closed/indestructible/hoteldoor/Initialize(mapload)
 	. = ..()
 	register_context()
 
+/turf/closed/indestructible/hoteldoor/Destroy(force)
+	LAZYNULL(peeking_users)
+	return ..()
+
 /turf/closed/indestructible/hoteldoor/add_context(atom/source, list/context, obj/item/held_item, mob/user)
 	. = ..()
 	context[SCREENTIP_CONTEXT_ALT_LMB] = "Peek through"
 	return CONTEXTUAL_SCREENTIP_SET
+
+// Cancel the peeking of anyone peeking out of this door when the turf changes
+/turf/closed/indestructible/hoteldoor/ChangeTurf(path, list/new_baseturfs, flags)
+	for(var/mob/user in peeking_users)
+		cancel_peek(user)
+	return ..()
+
+/// Cancel the peeking of anyone peeking out of this door while they are deleted
+/turf/closed/indestructible/hoteldoor/proc/on_peeker_qdeleted(datum/source, force)
+	SIGNAL_HANDLER
+	LAZYREMOVE(peeking_users, source)
+
+/// Cancels a user's peeking
+/turf/closed/indestructible/hoteldoor/proc/cancel_peek(mob/user)
+	for(var/datum/action/peephole_cancel/cancel_action in user.actions)
+		INVOKE_ASYNC(cancel_action, TYPE_PROC_REF(/datum/action/peephole_cancel, Trigger))
 
 /turf/closed/indestructible/hoteldoor/proc/promptExit(mob/living/user)
 	if(!isliving(user))
@@ -361,22 +383,27 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 	to_chat(user, span_notice("You peek through the door's bluespace peephole..."))
 	user.reset_perspective(parentSphere)
 	var/datum/action/peephole_cancel/PHC = new
+	PHC.door = src
 	user.overlay_fullscreen("remote_view", /atom/movable/screen/fullscreen/impaired, 1)
 	PHC.Grant(user)
+	LAZYADD(peeking_users, user)
 	RegisterSignal(user, COMSIG_MOVABLE_MOVED, PROC_REF(check_eye))
+	RegisterSignal(user, COMSIG_QDELETING, PROC_REF(on_peeker_qdeleted))
 	return CLICK_ACTION_SUCCESS
 
 /turf/closed/indestructible/hoteldoor/proc/check_eye(mob/user, atom/oldloc, direction)
 	SIGNAL_HANDLER
 	if(get_dist(get_turf(src), get_turf(user)) < 2)
 		return
-	for(var/datum/action/peephole_cancel/PHC in user.actions)
-		INVOKE_ASYNC(PHC, TYPE_PROC_REF(/datum/action/peephole_cancel, Trigger))
+	cancel_peek(user)
+	UnregisterSignal(user, COMSIG_QDELETING)
 
 /datum/action/peephole_cancel
 	name = "Cancel View"
 	desc = "Stop looking through the bluespace peephole."
 	button_icon_state = "cancel_peephole"
+	/// The door this peephole view is looking through
+	var/turf/closed/indestructible/hoteldoor/door
 
 /datum/action/peephole_cancel/Trigger(mob/clicker, trigger_flags)
 	. = ..()
@@ -385,8 +412,13 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 	to_chat(owner, span_warning("You move away from the peephole."))
 	owner.reset_perspective()
 	owner.clear_fullscreen("remote_view", 0)
-	UnregisterSignal(owner, COMSIG_MOVABLE_MOVED)
+	door?.UnregisterSignal(owner, COMSIG_MOVABLE_MOVED)
+	LAZYREMOVE(door?.peeking_users, owner)
 	qdel(src)
+
+/datum/action/peephole_cancel/Destroy(force)
+	door = null
+	return ..()
 
 // Despite using the ruins.dmi, hilbertshotel is not a ruin
 /area/misc/hilbertshotel
