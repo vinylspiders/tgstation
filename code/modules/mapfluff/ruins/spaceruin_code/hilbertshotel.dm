@@ -520,7 +520,7 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 			turfNumber++
 	parentSphere.storedRooms["[roomnumber]"] = storage
 	parentSphere.activeRooms -= "[roomnumber]"
-	qdel(reservation)
+	QDEL_NULL(reservation)
 
 /area/misc/hilbertshotelstorage
 	name = "Hilbert's Hotel Storage Room"
