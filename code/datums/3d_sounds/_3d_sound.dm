@@ -200,13 +200,12 @@
 
 	listeners -= no_longer_listening
 	no_longer_listening.stop_sound_channel(our_channel)
-	// COMSIG_QDELETING/COMSIG_MOVABLE_MOVED are registered in New(), so leave them registered
 	var/list/unregister_signals = list(
 		COMSIG_MOB_LOGIN,
 		SIGNAL_ADDTRAIT(TRAIT_DEAF),
 		SIGNAL_REMOVETRAIT(TRAIT_DEAF),
 	)
-	if(no_longer_listening != parent)
+	if(no_longer_listening != parent) // COMSIG_QDELETING/COMSIG_MOVABLE_MOVED are registered in New(), leave them registered
 		unregister_signals += list(COMSIG_QDELETING, COMSIG_MOVABLE_MOVED)
 	if(preference_signal)
 		unregister_signals += preference_signal
