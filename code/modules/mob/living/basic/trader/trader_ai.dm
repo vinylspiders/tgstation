@@ -24,7 +24,6 @@
 	if(!shop || !controller.blackboard_key_exists(BB_FIRST_CUSTOMER))
 		return AI_BEHAVIOR_DELAY | AI_BEHAVIOR_FAILED
 	controller.clear_blackboard_key(BB_FIRST_CUSTOMER)
-	return AI_BEHAVIOR_DELAY | AI_BEHAVIOR_SUCCEEDED
 	return start_async()
 
 /datum/bt_node/ai_behavior/setup_shop/perform_async(datum/ai_controller/controller)
