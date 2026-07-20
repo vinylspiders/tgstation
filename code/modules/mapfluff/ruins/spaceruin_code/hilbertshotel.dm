@@ -214,7 +214,7 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 						var/list/possible_transtitons = list()
 						for(var/z_level in SSmapping.z_list)
 							var/datum/space_level/space_level = z_level
-							if (D.linkage == CROSSLINKED)
+							if (space_level.linkage == CROSSLINKED)
 								possible_transtitons += space_level.z_value
 						var/_z = pick(possible_transtitons)
 						var/_x = rand(min,max)
