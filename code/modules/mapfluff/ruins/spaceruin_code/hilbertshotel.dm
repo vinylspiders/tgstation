@@ -142,10 +142,10 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 							room_turf.y + y,
 							room_turf.z,
 						))
-						if(storageObj && (atom in storageObj.wallmounted_contents))
+						if(storage_obj && (atom in storage_obj.wallmounted_contents))
 							var/obj/stored_in = atom
 							if(istype(stored_in))
-								storedIn.find_and_mount_on_atom()
+								stored_in.find_and_mount_on_atom()
 				turfNumber++
 		qdel(storage_obj)
 		storedRooms -= "[roomNumber]"
@@ -206,7 +206,7 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 				for(var/j in 0 to hotelRoomTemp.height-1)
 					for(var/atom/movable/atom in locate(room_bottom_left.x + i, room_bottom_left.y + j, room_bottom_left.z))
 						if(ismob(atom))
-							var/mob/mob_atom = mob_atom
+							var/mob/mob_atom = atom
 							if(mob_atom.mind)
 								to_chat(mob_atom, span_warning("As the sphere breaks apart, you're suddenly ejected into the depths of space!"))
 						var/max = world.maxx-TRANSITIONEDGE
@@ -220,7 +220,7 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 						var/_x = rand(min,max)
 						var/_y = rand(min,max)
 						var/turf/turf_to_place_at = locate(_x, _y, _z)
-						atom.forceMove(T)
+						atom.forceMove(turf_to_place_at)
 			qdel(room)
 
 	if(length(storedRooms))
@@ -488,7 +488,7 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 			var/list/current_living_mobs = get_all_contents_type(/mob/living) //Got to catch anyone hiding in anything
 			for(var/mob/living/living_mob as anything in current_living_mobs) //Check to see if theres any sentient mobs left.
 				if(living_mob.mind)
-					stillPopulated = TRUE
+					still_populated = TRUE
 					break
 			if(!still_populated)
 				storeRoom()
@@ -509,7 +509,7 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 		for(var/y in 0 to parentSphere.hotelRoomTemp.height-1)
 			var/list/turfContents = list()
 			for(var/atom/movable/atom in locate(room_bottom_left.x + x, room_bottom_left.y + y, room_bottom_left.z))
-				if(ismob(atom) && !isliving(A))
+				if(ismob(atom) && !isliving(atom))
 					continue //Don't want to store ghosts
 				turfContents += atom
 				if(HAS_TRAIT(atom, TRAIT_WALLMOUNTED))
