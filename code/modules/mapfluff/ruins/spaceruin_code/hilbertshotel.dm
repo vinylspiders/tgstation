@@ -200,7 +200,7 @@ GLOBAL_VAR_INIT(hhMysteryRoomNumber, rand(1, 999999))
 /obj/item/hilbertshotel/proc/ejectRooms()
 	if(length(activeRooms))
 		for(var/active_room, turf_reservation in activeRooms)
-			var/datum/turf_reservation/room = active_room
+			var/datum/turf_reservation/room = turf_reservation
 			var/turf/room_bottom_left = room.bottom_left_turfs[1]
 			for(var/i in 0 to hotelRoomTemp.width-1)
 				for(var/j in 0 to hotelRoomTemp.height-1)
