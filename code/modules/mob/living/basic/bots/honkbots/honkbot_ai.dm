@@ -114,6 +114,9 @@
 	var/target_key
 
 /datum/bt_node/ai_behavior/play_with_clown/perform(seconds_per_tick, datum/ai_controller/controller)
+	var/async_flags = handle_async()
+	if(async_flags)
+		return async_flags
 	var/mob/living/living_target = controller.blackboard[target_key]
 	if(QDELETED(living_target))
 		return AI_BEHAVIOR_DELAY | AI_BEHAVIOR_FAILED
@@ -125,7 +128,14 @@
 	living_pawn.manual_emote("celebrates with [living_target]!")
 	INVOKE_ASYNC(living_pawn, TYPE_PROC_REF(/mob, emote), "flip")
 	INVOKE_ASYNC(living_pawn, TYPE_PROC_REF(/mob, emote), "beep")
-	return AI_BEHAVIOR_DELAY | AI_BEHAVIOR_SUCCEEDED
+	return start_async()
+
+/datum/bt_node/ai_behavior/play_with_clown/perform_async(datum/ai_controller/controller)
+	var/datum/action/honk_ability = controller.blackboard[BB_HONK_ABILITY]
+	honk_ability?.Trigger()
+	if(!async_still_valid())
+		return
+	finish_async(AI_BEHAVIOR_SUCCEEDED)
 
 /datum/bt_node/ai_behavior/play_with_clown/finish_action(datum/ai_controller/basic_controller/bot/controller, succeeded)
 	. = ..()
