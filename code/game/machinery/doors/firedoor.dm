@@ -404,8 +404,8 @@
 	remove_as_source()
 	soundloop.stop()
 	is_playing_alarm = FALSE
-	update_appearance(UPDATE_ICON) //Sets the door lights even if the door doesn't move.
 	correct_state()
+	update_appearance(UPDATE_ICON) //Sets the door lights even if the door doesn't move.
 
 /**
  * Open the firedoor without resetting existing alarms
@@ -422,8 +422,8 @@
 	soundloop.stop()
 	is_playing_alarm = FALSE
 	remove_as_source()
-	update_appearance(UPDATE_ICON) //Sets the door lights even if the door doesn't move.
 	correct_state()
+	update_appearance(UPDATE_ICON) //Sets the door lights even if the door doesn't move.
 
 	/// Please be called 3 seconds after the LAST open, rather then 3 seconds after the first
 	addtimer(CALLBACK(src, PROC_REF(release_constraints)), 3 SECONDS, TIMER_UNIQUE | TIMER_OVERRIDE)
