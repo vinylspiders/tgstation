@@ -377,8 +377,8 @@
 	active = TRUE
 	alarm_type = code
 	add_as_source()
-	update_appearance(UPDATE_ICON) //Sets the door lights even if the door doesn't move.
 	correct_state()
+	update_appearance(UPDATE_ICON) //Sets the door lights even if the door doesn't move.
 
 /// Adds this fire door as a source of trouble to all of its areas
 /obj/machinery/door/firedoor/proc/add_as_source()
