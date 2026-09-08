@@ -343,6 +343,7 @@ export function CommandBar() {
       argValues[verbArgs[i].name] = val;
     }
     pushHistory(input);
+    blurToMap();
     Byond.sendMessage('verbs/invoke', {
       verb_type: selectedVerb.type,
       args: argValues,
@@ -497,6 +498,7 @@ export function CommandBar() {
           const verb = verbSuggestions[selectedIndex];
           if (verb.args.length === 0) {
             pushHistory(input);
+            blurToMap();
             Byond.sendMessage('verbs/invoke', {
               verb_type: verb.type,
               args: {},
