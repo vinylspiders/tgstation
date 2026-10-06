@@ -93,3 +93,20 @@
       pick up.
   - bugfix: fixes salesman glasses occasionally being stuck mimicking their previous
       wearer's lack of sanity
+2026-10-06:
+  the-orange-cow:
+  - rscadd: New fertilizer at your local biogenerator, Chemo Cultivate. Reduces weeds,
+      reduces lifespan and endurance of plants. Use with care.
+  - rscadd: New fertilizer at your local biogenerator, Stabili Feed. Reduces instability,
+      has a chance of culling plant traits and reagents. USE WITH EXTREME CARE.
+  - balance: Enduro Grow endurance gain per unit per cycle increased from .35 to .5
+  tontyGH:
+  - refactor: 'A lot of code relating to hands was altered for technical reasons,
+      which fixed these issues:'
+  - bugfix: Sleeping Carp's style malus did not ignore "cool" held items
+  - bugfix: Cursed blade could not be used to bind haunted longsword
+  - bugfix: Amber focus could not be used to bind haunted longsword
+  - bugfix: Items that could block did not correctly block push/shuffle attempts
+  - bugfix: The swap_hands tutorial did not account for 3+ hands
+  - bugfix: High-tenning a mob did not account for more than 2 hands (you can high-twenty
+      now!)
