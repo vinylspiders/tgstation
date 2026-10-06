@@ -100,6 +100,9 @@
   Melbert:
   - bugfix: Fish cannot be paraplegics
   - bugfix: Fish can no longer breathe air via a history of nicotine abuse
+  PapaMichael:
+  - qol: AIs and Cyborgs can set the zoom of their photo cameras.
+  - bugfix: pAI photo zoom is no longer broken
   SmArtKar, LemonInTheDark:
   - refactor: Separated overlay light visuals from the component/turf lumcount
   the-orange-cow:
