@@ -124,3 +124,16 @@
   vinylspiders:
   - bugfix: fixes lighting getting created twice on some tiles during round startup
   - bugfix: fixed crates and beds losing their elevation after a shuttle moves.
+2026-10-07:
+  Jacquerel:
+  - bugfix: Colossus no longer enrages for no reason upon seeing a Golem
+  Melbert:
+  - refactor: You can now pin the corgi's tail from "pin the tail on the corgi" on
+      anything
+  - qol: Pin the tail on the corgi kit comes with 1 poster, 4 pins, and 1 blindfold.
+  RusselNotSCP:
+  - rscadd: Eight new cocktails from the halls of the Mansus are now available to
+      be mixed and enjoyed (at your own risk.)
+  timothymtorres:
+  - bugfix: Fix wound chance for legs from falling z-levels decreasing the more z-levels
+      you fall down
