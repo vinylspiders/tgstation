@@ -138,3 +138,6 @@
   timothymtorres:
   - bugfix: Fix wound chance for legs from falling z-levels decreasing the more z-levels
       you fall down
+  vinylspiders:
+  - bugfix: raptor eggs that weren't laid by a raptor (mapped or spawned in) now hatch
+      a proper chick instead of a bugged, invisible one.
