@@ -127,6 +127,7 @@
 2026-10-07:
   Jacquerel:
   - bugfix: Colossus no longer enrages for no reason upon seeing a Golem
+  - bugfix: Golems who eat rocks will look different, like they are supposed to
   Melbert:
   - refactor: You can now pin the corgi's tail from "pin the tail on the corgi" on
       anything
