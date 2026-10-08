@@ -164,6 +164,9 @@
   - rscadd: Add EMP protection to EMP flashlights
   - rscadd: Flares, candles, slime lights, and glowsticks no longer directly conduct
       electricity
+  - rscadd: Welding affects nearby mobs that don't have flash protection. Special
+      welding tools like the CE's experimental welder or the alien welding object
+      can safely ignore harming nearby mobs.
   vinylspiders:
   - bugfix: Monkeys no longer pull a weapon out of your hands or off your back when
       you picked it up before they got to it.
