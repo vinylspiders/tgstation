@@ -167,6 +167,15 @@
   - rscadd: Welding affects nearby mobs that don't have flash protection. Special
       welding tools like the CE's experimental welder or the alien welding object
       can safely ignore harming nearby mobs.
+  tontyGH:
+  - qol: Added multiple new keybinds for hand control
+  - qol: Hand-related keybinds were moved to DEXTROUS category
+  - bugfix: Cycling hands would get stuck on offhand items instead of skipping over
+      them
+  - bugfix: Catching now tries to put caught items in every possible open hand instead
+      of just the active offhand
+  - bugfix: Tentacle's aggro grab had weird behaviour that made it ignore a lot of
+      systems
   vinylspiders:
   - bugfix: Monkeys no longer pull a weapon out of your hands or off your back when
       you picked it up before they got to it.
