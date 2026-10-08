@@ -141,3 +141,36 @@
   vinylspiders:
   - bugfix: raptor eggs that weren't laid by a raptor (mapped or spawned in) now hatch
       a proper chick instead of a bugged, invisible one.
+2026-10-08:
+  FalloutFalcon:
+  - bugfix: Handling on if you can make eye contact is a bit more robust
+  - bugfix: Some examine text for eye effects acctaully checks if you have eyes
+  Melbert:
+  - rscadd: Fishes can toggle snouts in character creation (the same way they can
+      toggle frills)
+  - bugfix: Fishes cannot be as dark as the abyss
+  necromanceranne:
+  - rscadd: Knives do additional damage if you first grab hold of your target.
+  - rscadd: Some knives can be impaled into someone with right click.
+  - balance: Kitchen knives and shivs have embedding behaviour.
+  - balance: Most knives have better chances of embedding. Only combat knives have
+      particularly lethal embed effects.
+  timothymtorres:
+  - rscadd: Add EMP effects to Thermomachines, Portable Canisters, Lights, Flashlights,
+      Floorlights, Floodlights, Seclights on Guns, Lights on Plasmamen Helmets, Hardhat
+      Lights, PDA Flashlights, Ore Silos, Buttons, Turret Controllers, Teleporter
+      Beacons, Trapdoors, and Morgue Trays. Also improves admin logging for atmospheric
+      EMP effects.
+  - rscadd: Add EMP protection to EMP flashlights
+  - rscadd: Flares, candles, slime lights, and glowsticks no longer directly conduct
+      electricity
+  vinylspiders:
+  - bugfix: Monkeys no longer pull a weapon out of your hands or off your back when
+      you picked it up before they got to it.
+  - bugfix: Fish infusion organs now make better bait taste better to you, and a stoat
+      tongue makes eggs and dead mice taste better, as intended.
+  - bugfix: hardcore random, anonymous theme and appearance-banned characters now
+      get just a random set of personalities instead of a random set piled on top
+      of their own
+  - bugfix: random personalities can no longer come with two that contradict each
+      other, like loyal and disillusioned.
