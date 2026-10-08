@@ -149,6 +149,7 @@
   - rscadd: Fishes can toggle snouts in character creation (the same way they can
       toggle frills)
   - bugfix: Fishes cannot be as dark as the abyss
+  - bugfix: Maybe fixes lighting
   alexguinea:
   - rscadd: Added the litigation set of forms to the blanks in the photocopier.
   necromanceranne:
