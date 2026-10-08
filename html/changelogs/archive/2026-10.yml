@@ -149,6 +149,8 @@
   - rscadd: Fishes can toggle snouts in character creation (the same way they can
       toggle frills)
   - bugfix: Fishes cannot be as dark as the abyss
+  alexguinea:
+  - rscadd: Added the litigation set of forms to the blanks in the photocopier.
   necromanceranne:
   - rscadd: Knives do additional damage if you first grab hold of your target.
   - rscadd: Some knives can be impaled into someone with right click.
