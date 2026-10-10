@@ -39,7 +39,7 @@
 
 	soup_sound = new(parent)
 
-/datum/component/stove/Destroy()
+/datum/component/stove/Destroy(force)
 	STOP_PROCESSING(SSmachines, src)
 	QDEL_NULL(soup_sound)
 	return ..()
