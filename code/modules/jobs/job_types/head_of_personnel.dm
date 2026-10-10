@@ -120,7 +120,8 @@
 
 //only pet worth reviving
 /datum/job/head_of_personnel/get_mail_goodies(mob/recipient)
-	. = ..()
+	var/list/base_goodies = ..()
+	. = base_goodies.Copy()
 	// Strange Reagent if the pet is dead.
 	for(var/mob/living/basic/pet/dog/corgi/ian/staff_pet in GLOB.dead_mob_list)
 		. += list(/obj/item/reagent_containers/cup/bottle/strange_reagent = 20)
