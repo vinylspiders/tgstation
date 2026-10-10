@@ -250,6 +250,11 @@
   - rscadd: Ethereals can now equip underwear in the character customization menu!
       Now you too can impress your friends with your pride flag socks and union jack
       boxer shorts.
+  Moonridden:
+  - config: The help link for revenants now uses the config set, rather than a hard-coded
+      link.
+  PapaMichael:
+  - bugfix: Imported chat settings will last longer than one round
   RusselNotSCP:
   - bugfix: Footsoldier's Razor recipe no longer has dumb overlap with Pump-up, and
       instead now uses it as an ingredient
@@ -276,3 +281,4 @@
       or turns into a normal explosion if the crystal heals
   - bugfix: cyborgs disconnect cleanly from deleted AIs, keeping RoboTact usable with
       their own camera photos.
+  - refactor: gives all the icon_state mapping turf varedits their own types
