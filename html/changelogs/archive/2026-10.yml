@@ -242,6 +242,9 @@
   - bugfix: the prototype emitter's manual firing mode gives you its controls in your
       hands again.
 2026-10-10:
+  RusselNotSCP:
+  - bugfix: Footsoldier's Razor recipe no longer has dumb overlap with Pump-up, and
+      instead now uses it as an ingredient
   vinylspiders:
   - bugfix: catching a basketball and dribbling it no longer leaves a phantom ball
       stuck in your other hand
@@ -249,3 +252,5 @@
       or gets pulled back to your feet when you're knocked down
   - bugfix: if you're holding two basketballs and drop one, the one still in your
       hand does the dribbling now
+  - bugfix: pyrophobia now builds fear from being on fire when no fire hallucination
+      is present.
