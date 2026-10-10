@@ -241,3 +241,11 @@
   - bugfix: manning a deployable turret gives you its controls in your hands again.
   - bugfix: the prototype emitter's manual firing mode gives you its controls in your
       hands again.
+2026-10-10:
+  vinylspiders:
+  - bugfix: catching a basketball and dribbling it no longer leaves a phantom ball
+      stuck in your other hand
+  - bugfix: a basketball you've let go of no longer keeps bouncing when you walk,
+      or gets pulled back to your feet when you're knocked down
+  - bugfix: if you're holding two basketballs and drop one, the one still in your
+      hand does the dribbling now
