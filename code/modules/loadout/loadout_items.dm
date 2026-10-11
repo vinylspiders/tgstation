@@ -146,7 +146,7 @@ GLOBAL_LIST_INIT(all_loadout_categories, init_loadout_categories())
 		user,
 		allowed_configs,
 		CALLBACK(src, PROC_REF(set_slot_greyscale), manager),
-		starting_icon_state = initial(item_path.icon_state),
+		starting_icon_state = initial(item_path.post_init_icon_state) || initial(item_path.icon_state),
 		starting_config = initial(item_path.greyscale_config),
 		starting_colors = loadout?[item_path]?[INFO_GREYSCALE] || initial(item_path.greyscale_colors),
 	)

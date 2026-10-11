@@ -163,7 +163,7 @@
 					allowed_configs += "[initial(item.greyscale_config_inhand_right)]"
 			var/datum/greyscale_modify_menu/menu = new(
 				src, ui.user, allowed_configs, CALLBACK(src, PROC_REF(_vend_greyscale), params, ui.user),
-				starting_icon_state=initial(fake_atom.icon_state),
+				starting_icon_state = initial(fake_atom.post_init_icon_state) || initial(fake_atom.icon_state),
 				starting_config = initial(fake_atom.greyscale_config),
 				starting_colors = initial(fake_atom.greyscale_colors)
 			)
