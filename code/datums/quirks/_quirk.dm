@@ -103,6 +103,8 @@
 			to_chat(quirk_holder, gain_text)
 		if (unique)
 			add_unique(client_source)
+			if(QDELETED(src))
+				return FALSE
 
 		if(quirk_holder.client)
 			post_add()
