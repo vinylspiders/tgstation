@@ -393,6 +393,8 @@
 	light_color = COLOR_YELLOW
 	light_power = 1
 	light_range = 1.5
+	// Shared emissives only, since a reused segment keeps its turf signals and light
+	allowed_reuse_flags = BEAM_REUSE_SHARED_EMISSIVES
 
 // movespeed mods
 /datum/movespeed_modifier/tasing_someone

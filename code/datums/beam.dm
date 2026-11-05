@@ -1,17 +1,9 @@
-/// Glows list index for full-length segments. 1 to 31 hold the last segment's glow, since it gets cut short to fit
-#define BEAM_FULL_SEGMENT_GLOW_INDEX 32
-/// Max number of different beam looks we keep spare visuals for
-#define BEAM_MAX_LOOKS_WITH_SPARE_VISUALS 64
-/// Max spare visuals we keep per look
-#define BEAM_MAX_SPARE_VISUALS_PER_LOOK 4
-/// Segments share one glow overlay per look instead of each building their own
-#define BEAM_REUSE_SHARED_GLOWS (1<<0)
-/// On a redraw, a segment that would land on the same turf is kept instead of remade
-#define BEAM_REUSE_OLD_SEGMENTS (1<<1)
-/// A new beam can take the visuals a finished beam with the same look left behind
-#define BEAM_REUSE_SPARE_VISUALS (1<<2)
-/// All of the above. Only plain /datum/beam and /obj/effect/ebeam get these, subtypes have to opt in (see reuse_flags_by_beam_type)
-#define BEAM_REUSE_ALL (BEAM_REUSE_SHARED_GLOWS | BEAM_REUSE_OLD_SEGMENTS | BEAM_REUSE_SPARE_VISUALS)
+/// Shared emissives list index for full-length segments. 1 to 31 are for the last segment, one for each length it can be cut to
+#define BEAM_FULL_SEGMENT_EMISSIVE_INDEX 32
+/// Max number of different visuals setups we keep spare visuals for
+#define BEAM_MAX_SETUPS_WITH_SPARE_VISUALS 64
+/// Max spare visuals we keep per visuals setup
+#define BEAM_MAX_SPARE_VISUALS_PER_SETUP 4
 
 /** # Beam Datum and Effect
  * **IF YOU ARE LAZY AND DO NOT WANT TO READ, GO TO THE BOTTOM OF THE FILE AND USE THAT PROC!**
@@ -37,7 +29,7 @@
 	///icon state of the main segments of the beam
 	var/icon_state = ""
 	///Cache of the last segment's icon cut short to fit, "[icon]" -> icon_state -> icon per cut row (1 to 31). See get_terminal_icon_cut_at()
-	var/static/list/cached_terminal_icons
+	VAR_PRIVATE/static/list/cached_terminal_icons
 	///Our beam's alpha
 	var/alpha = 255
 	///The beam will qdel if it's longer than this many tiles.
@@ -46,10 +38,10 @@
 	var/beam_type = /obj/effect/ebeam
 	///This is used as the visual_contents of beams, so you can apply one effect to this and the whole beam will look like that. never gets deleted on redrawing.
 	var/obj/effect/ebeam/visuals
-	///Key for how our beam looks, "[icon]|[icon_state]|[beam_color]|[emissive]|[beam_layer]". Only set if our visuals can go to the next beam that looks the same
-	var/visuals_look_key
-	///Visuals left behind by finished beams, waiting for a new beam with the same look. look -> list(the look's appearance, then the spares)
-	var/static/list/spare_visuals_by_look
+	///Key for our visuals setup (the segment type and the vars set_up_effect() sets): "[beam_type]|[icon]|[icon_state]|[beam_color]|[emissive]|[beam_layer]". Only set if our visuals can go to the next beam with the same setup
+	VAR_PRIVATE/visuals_setup_key
+	///Visuals that finished beams left behind for the next beam with the same visuals setup. setup key -> list(the setup's appearance, then the spares)
+	VAR_PRIVATE/static/list/spare_visuals_by_setup
 	///The color of the beam we're drawing.
 	var/beam_color
 	///If we use an emissive appearance, and if so, what type?
@@ -97,41 +89,19 @@
 	///Duration of the last animation, in deciseconds (matches the time= passed to animate()).
 	var/anim_duration = 0
 	///world.time our current Draw() started, null when not drawing. Stored as a time so if Draw() runtimes we're only stuck for the rest of that tick
-	var/draw_start_time
+	VAR_PRIVATE/draw_start_time
 	///Something asked for a Draw() while we were already drawing, so we draw again once we're done
-	var/redraw_requested_mid_draw = FALSE
-	///Glow overlays shared by every beam that looks like ours on our plane offset (see BEAM_FULL_SEGMENT_GLOW_INDEX for the layout)
-	var/list/shared_glows
-	///Plane offset our glows were made for. Changes with the z-level, so we grab a new list when it does
-	var/shared_glows_plane_offset
-	///All the shared glows lists, by "[icon]|[icon_state]|[emissive]|[alpha]|[emissive_alpha]|[plane offset]"
-	var/static/list/shared_glows_by_look
+	VAR_PRIVATE/redraw_requested_mid_draw = FALSE
+	///Emissive overlays shared by every beam with our emissive setup (see BEAM_FULL_SEGMENT_EMISSIVE_INDEX for the layout)
+	VAR_PRIVATE/list/shared_emissives
+	///Plane offset our shared emissives were made for. Changes with the z-level, so we grab a new list when it does
+	VAR_PRIVATE/shared_emissives_plane_offset
+	///All the shared emissives lists, by emissive setup "[icon]|[icon_state]|[emissive]|[alpha]|[emissive_alpha]|[plane offset]"
+	VAR_PRIVATE/static/list/shared_emissives_by_setup
+	///Which BEAM_REUSE_* flags beams of our type can use. Subtypes inherit it, so drop what yours can't take (see the BEAM_REUSE_* defines in [code/__DEFINES/beam.dm]). We only use a flag our segment type allows too
+	var/allowed_reuse_flags = BEAM_REUSE_ALL
 	///Which BEAM_REUSE_* flags we use, worked out in Start() from our beam type and segment type
-	var/reuse_flags = NONE
-	///Reuse flags for beam subtypes, exact type only. Anything not listed reuses nothing and works like it always did. These are not datum vars deliberately, so new subtypes/ones in downstreams are unaffected.
-	var/static/list/reuse_flags_by_beam_type = list(
-		// Tesla bolts come in bursts and never redraw, and every segment rolls its own icon state, so nothing's worth keeping
-		/datum/beam/varied = BEAM_REUSE_SHARED_GLOWS | BEAM_REUSE_SPARE_VISUALS,
-		// Fishing lines and borg vacuum hoses redraw whenever their holder walks or turns
-		/datum/beam/held = BEAM_REUSE_OLD_SEGMENTS,
-		/datum/beam/held/vacuum = BEAM_REUSE_OLD_SEGMENTS,
-	)
-	///Reuse flags for segment subtypes, exact type only. A beam only uses a flag if its beam type allows it too. These are not datum vars deliberately, so new subtypes/ones in downstreams are unaffected.
-	var/static/list/reuse_flags_by_segment_type = list(
-		// These follow a mob or projectile around, so they redraw a lot
-		/obj/effect/ebeam/chain = BEAM_REUSE_SHARED_GLOWS | BEAM_REUSE_OLD_SEGMENTS,
-		/obj/effect/ebeam/cosmic = BEAM_REUSE_SHARED_GLOWS | BEAM_REUSE_OLD_SEGMENTS,
-		/obj/effect/ebeam/curse_arm = BEAM_REUSE_SHARED_GLOWS | BEAM_REUSE_OLD_SEGMENTS,
-		/obj/effect/ebeam/electrodes_nozap = BEAM_REUSE_SHARED_GLOWS | BEAM_REUSE_OLD_SEGMENTS,
-		/obj/effect/ebeam/medical = BEAM_REUSE_SHARED_GLOWS | BEAM_REUSE_OLD_SEGMENTS,
-		// Kept vine segments still hurt whoever steps on them. No glows, we haven't tested those on vines
-		/obj/effect/ebeam/vine = BEAM_REUSE_OLD_SEGMENTS,
-		// Nothing draws these with a glow
-		/obj/effect/ebeam/goliath = BEAM_REUSE_OLD_SEGMENTS,
-		/obj/effect/ebeam/tether = BEAM_REUSE_OLD_SEGMENTS,
-		// Glows only. Kept segments would keep their turf signals and light too, and we haven't tested that
-		/obj/effect/ebeam/reacting/electrodes = BEAM_REUSE_SHARED_GLOWS,
-	)
+	VAR_PRIVATE/reuse_flags = NONE
 
 /datum/beam/New(
 	origin,
@@ -175,21 +145,20 @@
  * Proc called by the atom Beam() proc. Sets up signals, and draws the beam for the first time.
  */
 /datum/beam/proc/Start()
-	// Plain /datum/beam and /obj/effect/ebeam reuse everything, subtypes only what they're listed for, and we only use what both types allow
-	var/beam_type_reuse_flags = type == /datum/beam ? BEAM_REUSE_ALL : reuse_flags_by_beam_type[type]
-	var/segment_type_reuse_flags = beam_type == /obj/effect/ebeam ? BEAM_REUSE_ALL : reuse_flags_by_segment_type[beam_type]
-	reuse_flags = beam_type_reuse_flags & segment_type_reuse_flags
-	// Reuse visuals a finished beam with our look left behind (see Destroy()). Our look has to work as a text key, so runtime icons don't
+	// We only use what both our type and our segment type allow
+	var/obj/effect/ebeam/segment_type = beam_type
+	reuse_flags = allowed_reuse_flags & initial(segment_type.allowed_reuse_flags)
+	// Take visuals a finished beam with our visuals setup left behind (see Destroy()). Runtime icons and color matrices can't go in a text key, so those beams make their own
 	if((reuse_flags & BEAM_REUSE_SPARE_VISUALS) && isfile(icon) && istext(icon_state) && (isnull(beam_color) || istext(beam_color)))
-		// 9 digits, since "[beam_layer]" only keeps 6 and two layers could end up with the same key
-		visuals_look_key = "[icon]|[icon_state]|[beam_color]|[emissive]|[num2text(beam_layer, 9)]"
-		var/list/spares_for_look = LAZYACCESS(spare_visuals_by_look, visuals_look_key)
+		// The segment type is in the key so visuals only go to beams made of the same segment type. The layer gets 9 digits because "[beam_layer]" only keeps 6, and with 6 two close layers can get the same key
+		visuals_setup_key = "[beam_type]|[icon]|[icon_state]|[beam_color]|[emissive]|[num2text(beam_layer, 9)]"
+		var/list/appearance_and_spares = LAZYACCESS(spare_visuals_by_setup, visuals_setup_key)
 		var/obj/effect/ebeam/taken_spare_visuals = null
-		// Index 1 is the look's appearance, the spares come after
-		for(var/spare_index in length(spares_for_look) to 2 step -1)
-			taken_spare_visuals = spares_for_look[spare_index]
-			spares_for_look.Cut(spare_index)
-			// Something else might've deleted it while it was waiting
+		// Index 1 is the setup's appearance and the spares come after
+		for(var/spare_index in length(appearance_and_spares) to 2 step -1)
+			taken_spare_visuals = appearance_and_spares[spare_index]
+			appearance_and_spares.Cut(spare_index)
+			// Something else can delete it while it waits
 			if(!QDELETED(taken_spare_visuals))
 				break
 			taken_spare_visuals = null
@@ -198,8 +167,8 @@
 		else
 			visuals = new beam_type()
 			set_up_effect(visuals, icon_state)
-			if(!spares_for_look)
-				add_look_for_spare_visuals()
+			if(!appearance_and_spares)
+				add_setup_for_spare_visuals()
 	else
 		visuals = new beam_type()
 		set_up_effect(visuals, icon_state)
@@ -275,14 +244,11 @@
 
 /datum/beam/Destroy()
 	QDEL_LIST(elements)
-	var/list/spares_for_look = visuals_look_key ? LAZYACCESS(spare_visuals_by_look, visuals_look_key) : null
-	// Only leave our visuals behind if there's room and nothing else can reach them (no refs, weak ref or tag), so nobody ends up holding another beam's visuals
-	var/has_room_and_no_other_holders = spares_for_look && length(spares_for_look) <= BEAM_MAX_SPARE_VISUALS_PER_LOOK && !QDELETED(visuals) && refcount(visuals) == 1 && !visuals.weak_reference && !visuals.tag
-	// They also have to be unchanged, so still our look's appearance and nothing an appearance doesn't cover (vis_contents, traits, owner, var edits)
-	if(has_room_and_no_other_holders && visuals.appearance == spares_for_look[1] && !length(visuals.vis_contents) && !visuals._status_traits && !visuals.owner && !(visuals.datum_flags & DF_VAR_EDITED))
-		// Stop any animation on them. One that ended where it started looks unchanged, so the check above can't see it
+	var/list/appearance_and_spares = visuals_setup_key ? LAZYACCESS(spare_visuals_by_setup, visuals_setup_key) : null
+	if(can_leave_visuals_behind(appearance_and_spares))
+		// Stop any animation on them
 		animate(visuals)
-		spares_for_look += visuals
+		appearance_and_spares += visuals
 		visuals = null
 	else
 		QDEL_NULL(visuals)
@@ -292,10 +258,10 @@
 	origin = null
 	return ..()
 
-// These are macros instead of procs to save a proc call per segment - this is hot!
+// These are macros instead of procs to save a proc call per segment, since Draw() runs a lot
 
-/// Declares final_x and final_y, the turf the segment lands on (counted from start_atom's), and segment_pixel_x_on_turf and segment_pixel_y_on_turf, its pixel offset on that turf
-// No sideways offset for a beam running straight along an axis. Whole tiles move the segment onto another turf (rounded toward start_atom), the rest stays as pixel offset
+/// Declares final_x and final_y, the coordinates of the turf the segment lands on, and segment_pixel_x_on_turf and segment_pixel_y_on_turf, its pixel offset on that turf
+// No sideways offset for a beam running straight along an axis. Whole tiles of offset move the segment from start_atom's turf to another one (rounded toward start_atom), and the rest stays as pixel offset
 #define BEAM_DECLARE_SEGMENT_POSITION(start_atom) \
 	var/segment_pixel_x_on_turf = (delta_x == 0) ? 0 : round(sin_angle + sin_angle * (segment_start + 16), 1);\
 	var/segment_pixel_y_on_turf = (delta_y == 0) ? 0 : round(cos_angle + cos_angle * (segment_start + 16), 1);\
@@ -310,8 +276,8 @@
 		segment_pixel_y_on_turf %= 32;\
 	}
 
-/// Sets a segment's alpha, layer and pixel offsets in Draw(), sliding it over from where the old beam had it when we animate
-// Segments start as far along the old beam (as it was mid-animation) as they end up along the new one, so redraws don't snap. Ones past its end fade in
+/// Sets a segment's alpha, layer and pixel offsets in Draw(). When we animate, it slides over from where the old beam had it
+// Segments start as far along the old beam (where it is mid-animation) as they end up along the new one, so redraws don't snap. Segments past the old beam's end fade in
 #define BEAM_PLACE_AND_ANIMATE_SEGMENT(...) \
 	segment.alpha = alpha;\
 	segment.layer = beam_layer;\
@@ -337,7 +303,7 @@
 		segment.pixel_y = new_pixel_y;\
 	}
 
-/// Gives a segment its own emissive overlay, for when it's not using a shared glow
+/// Gives a segment its own emissive overlay, for when it's not using a shared one
 #define BEAM_GIVE_SEGMENT_ITS_OWN_EMISSIVE(...) segment.add_overlay(emissive_appearance(terminal_icon ? terminal_icon : icon, terminal_icon ? "" : icon_state, segment, alpha = segment.alpha * emissive_alpha / 255, effect_type = emissive))
 
 /**
@@ -350,7 +316,7 @@
 		return
 	if((SEND_SIGNAL(src, COMSIG_BEAM_BEFORE_DRAW) & BEAM_CANCEL_DRAW) || QDELETED(src))
 		return
-	// draw_start_time is still set from an earlier tick, so that Draw() runtimed and never finished. Go ahead anyway
+	// If draw_start_time is still set from an earlier tick, that Draw() runtimed and never finished, so we go ahead anyway
 	draw_start_time = world.time
 	redraw_requested_mid_draw = FALSE
 	var/animate_time = pending_animate_time
@@ -423,24 +389,24 @@
 
 	var/list/old_elements = elements
 	var/list/new_elements = list()
-	// Use the shared glows for our look if our types allow it, instead of building an emissive overlay for every segment every Draw()
-	if(emissive && (reuse_flags & BEAM_REUSE_SHARED_GLOWS))
+	// Use the shared emissives for our emissive setup if our types allow it, instead of building an emissive overlay for every segment every Draw()
+	if(emissive && (reuse_flags & BEAM_REUSE_SHARED_EMISSIVES))
 		var/origin_plane_offset = GET_TURF_PLANE_OFFSET(origin_turf)
-		if(isnull(shared_glows) || origin_plane_offset != shared_glows_plane_offset)
-			shared_glows_plane_offset = origin_plane_offset
-			shared_glows = get_shared_glows_for_look()
+		if(isnull(shared_emissives) || origin_plane_offset != shared_emissives_plane_offset)
+			shared_emissives_plane_offset = origin_plane_offset
+			shared_emissives = get_shared_emissives_for_setup()
 	var/old_count = length(old_elements)
-	// TRUE at the index of each old segment we're keeping
-	var/list/kept_old_segment_indexes
-	// Keep an old segment when a new one would land on its turf, if our types allow it. Otherwise every segment gets made fresh
+	// TRUE at the index of each old segment we're reusing
+	var/list/reused_old_segment_indexes
+	// If our types allow it, reuse an old segment when a new one lands on its turf. Otherwise we make every segment new
 	if(old_count && (reuse_flags & BEAM_REUSE_OLD_SEGMENTS))
-		var/keepable_old_segment_count = old_count
-		// If the beam got shorter and its tail is fading out, only keep segments the new beam still covers so the tail fades like it always did
+		var/reusable_old_segment_count = old_count
+		// If the beam got shorter, its old tail fades out further down. Only reuse segments the new beam still covers, so the tail is left to fade
 		if(animate_time && progress >= 1)
-			keepable_old_segment_count = min(old_count, ceil(beam_length / 32))
+			reusable_old_segment_count = min(old_count, ceil(beam_length / 32))
 		var/list/old_segment_index_by_turf = list()
 		// Backwards, so each turf points at the first old segment on it
-		for(var/old_index in keepable_old_segment_count to 1 step -1)
+		for(var/old_index in reusable_old_segment_count to 1 step -1)
 			var/obj/effect/ebeam/old_segment = old_elements[old_index]
 			if(!QDELETED(old_segment) && old_segment.loc)
 				old_segment_index_by_turf[old_segment.loc] = old_index
@@ -456,26 +422,26 @@
 			if(matching_old_segment_index)
 				segment = old_elements[matching_old_segment_index]
 				// Diagonal beams can put two segments in a row on one turf, so point the turf at the next old segment if it's there too
-				var/obj/effect/ebeam/next_old_segment = matching_old_segment_index < keepable_old_segment_count ? old_elements[matching_old_segment_index + 1] : null
+				var/obj/effect/ebeam/next_old_segment = matching_old_segment_index < reusable_old_segment_count ? old_elements[matching_old_segment_index + 1] : null
 				old_segment_index_by_turf[destination_turf] = (next_old_segment?.loc == destination_turf) ? matching_old_segment_index + 1 : null
-				// It got deleted or moved, or we already kept it, so make a new one like before
-				if(QDELETED(segment) || segment.loc != destination_turf || kept_old_segment_indexes?[matching_old_segment_index])
+				// It got deleted or moved, or we already reused it, so we make a new one instead
+				if(QDELETED(segment) || segment.loc != destination_turf || reused_old_segment_indexes?[matching_old_segment_index])
 					segment = null
-			// TRUE if this is an old segment we're keeping. Kept segments never leave their turf
-			var/is_kept_old_segment = !isnull(segment)
+			// TRUE if this is an old segment we're reusing. Reused segments never leave their turf
+			var/is_reused_old_segment = !isnull(segment)
 			// TRUE if it still shows our visuals from the last Draw()
 			var/is_showing_our_visuals = FALSE
-			if(is_kept_old_segment)
-				if(!kept_old_segment_indexes)
-					kept_old_segment_indexes = new /list(keepable_old_segment_count)
-				kept_old_segment_indexes[matching_old_segment_index] = TRUE
-				// Undo what the last Draw() did to a kept segment so it ends up exactly like a new one
+			if(is_reused_old_segment)
+				if(!reused_old_segment_indexes)
+					reused_old_segment_indexes = new /list(reusable_old_segment_count)
+				reused_old_segment_indexes[matching_old_segment_index] = TRUE
+				// Undo what the last Draw() did to a reused segment so it ends up exactly like a new one
 				if(anim_duration)
 					animate(segment)
-				// Keep its glow, it gets swapped further down if it needs a different one
-				if(!segment.shared_glow)
+				// Keep its shared emissive, since we swap it further down if it needs a different one
+				if(!segment.shared_emissive)
 					segment.cut_overlays()
-				// If it was the last segment last time, it has a cut-short icon and our color, so reset those
+				// If it was the last segment in the last Draw(), it has a cut-short icon and our color, so reset those
 				if(matching_old_segment_index == old_count && segment.icon != initial(segment.icon))
 					segment.icon = initial(segment.icon)
 					segment.color = initial(segment.color)
@@ -499,23 +465,23 @@
 			else
 				segment.transform = rot_matrix
 
-			if(!is_kept_old_segment)
+			if(!is_reused_old_segment)
 				segment.forceMove(destination_turf)
 			BEAM_PLACE_AND_ANIMATE_SEGMENT()
-			// Shared glows are made for our z-level's plane offset. If placing the segment knocked it into nullspace, it builds its own glow below instead
-			if(shared_glows && segment.loc)
-				var/glow_index = terminal_icon ? beam_length - segment_start : BEAM_FULL_SEGMENT_GLOW_INDEX
-				var/mutable_appearance/shared_glow = shared_glows[glow_index] || build_shared_glow(segment, glow_index, terminal_icon)
-				// A kept segment already has the right glow, unless it went from last segment to full one (or back), or the last segment's length changed
-				if(segment.shared_glow != shared_glow)
-					if(segment.shared_glow)
+			// Shared emissives are made for our z-level's plane offset. If placing the segment knocked it into nullspace, it builds its own emissive overlay below instead
+			if(shared_emissives && segment.loc)
+				var/emissive_index = terminal_icon ? beam_length - segment_start : BEAM_FULL_SEGMENT_EMISSIVE_INDEX
+				var/mutable_appearance/shared_emissive = shared_emissives[emissive_index] || build_shared_emissive(segment, emissive_index, terminal_icon)
+				// A reused segment already has the right shared emissive, unless it went from last segment to full one (or back), or the last segment's length changed
+				if(segment.shared_emissive != shared_emissive)
+					if(segment.shared_emissive)
 						segment.cut_overlays()
-					segment.shared_glow = shared_glow
-					segment.add_overlay(shared_glow)
+					segment.shared_emissive = shared_emissive
+					segment.add_overlay(shared_emissive)
 			else if(emissive)
 				BEAM_GIVE_SEGMENT_ITS_OWN_EMISSIVE()
 	else
-		// Nothing to keep (first Draw(), or a beam that doesn't keep segments), so every segment is new and we skip the keeping logic
+		// Nothing to reuse (first Draw(), or a beam that doesn't reuse segments), so every segment is new and we skip the reuse logic
 		for(var/segment_start in 0 to beam_length - 1 step 32)
 			if(QDELETED(src))
 				break
@@ -537,14 +503,14 @@
 			BEAM_DECLARE_SEGMENT_POSITION(segment)
 			segment.forceMove(locate(final_x, final_y, segment.z))
 			BEAM_PLACE_AND_ANIMATE_SEGMENT()
-			if(shared_glows && segment.loc)
-				var/glow_index = terminal_icon ? beam_length - segment_start : BEAM_FULL_SEGMENT_GLOW_INDEX
-				segment.shared_glow = shared_glows[glow_index] || build_shared_glow(segment, glow_index, terminal_icon)
-				segment.add_overlay(segment.shared_glow)
+			if(shared_emissives && segment.loc)
+				var/emissive_index = terminal_icon ? beam_length - segment_start : BEAM_FULL_SEGMENT_EMISSIVE_INDEX
+				segment.shared_emissive = shared_emissives[emissive_index] || build_shared_emissive(segment, emissive_index, terminal_icon)
+				segment.add_overlay(segment.shared_emissive)
 			else if(emissive)
 				BEAM_GIVE_SEGMENT_ITS_OWN_EMISSIVE()
 
-	// Something our segments set off deleted the beam. Destroy() already got the old segments, so we delete the new ones
+	// Something our segments set off deleted the beam. Destroy() already deleted the old segments, so we delete the new ones
 	if(QDELETED(src))
 		QDEL_LIST(new_elements)
 		draw_start_time = null
@@ -553,10 +519,10 @@
 	// Fade out extra segments before deleting them so shrinking the beam does not pop the tail.
 	var/new_count = length(new_elements)
 	if(animate_time && old_count > new_count && progress >= 1)
-		// Old segments we kept are part of the new beam now, don't delete them
-		if(kept_old_segment_indexes)
+		// Old segments we reused are part of the new beam now, so don't delete them
+		if(reused_old_segment_indexes)
 			for(var/old_index in 1 to new_count)
-				if(!kept_old_segment_indexes[old_index])
+				if(!reused_old_segment_indexes[old_index])
 					qdel(old_elements[old_index])
 		else
 			for(var/old_index in 1 to new_count)
@@ -578,14 +544,14 @@
 				animate(dying, pixel_x = target_px_anim, pixel_y = target_py_anim, alpha = 0, time = animate_time, flags = ANIMATION_PARALLEL)
 			fading_segments_to_delete[old_count - old_index + 1] = dying
 		QDEL_LIST_IN(fading_segments_to_delete, animate_time)
-	else if(kept_old_segment_indexes)
+	else if(reused_old_segment_indexes)
 		for(var/old_index in 1 to old_count)
-			if(!kept_old_segment_indexes[old_index])
+			if(!reused_old_segment_indexes[old_index])
 				qdel(old_elements[old_index])
 		old_elements.Cut()
 	else
 		QDEL_LIST(old_elements)
-	// Deleting old segments can set off something that deletes the beam too, and then Destroy() already got the new ones
+	// Deleting old segments can set off something that deletes the beam too, and then Destroy() already deleted the new ones
 	if(QDELETED(src))
 		draw_start_time = null
 		return
@@ -623,17 +589,18 @@
 /**
  * Returns the icon for the beam's last segment, cut short so the beam ends right at its target
  *
- * Beams are drawn in 32 pixel segments, so unless a beam's length is a multiple of 32 its last segment would poke out past the target.
- * To stop that we copy our sprite, clear every pixel row from cut_row up, and fade out the few rows just below the cut so the end isn't a hard line.
+ * We draw beams in 32 pixel segments. If a beam's length isn't a multiple of 32, its last segment pokes out past the target.
+ * To stop that, we copy our sprite and clear every pixel row from cut_row up. Then we fade out the few rows just below the cut, so the end isn't a hard line.
  *
  * That's a fair bit of icon work, so for sprites loaded from a file we only build each cut once and keep it in cached_terminal_icons.
- * Keeping them costs nothing extra, since BYOND holds onto every rsc icon for the rest of the round anyway and dedupes identical ones.
- * Icons made at runtime all read as "" when turned into text, so we can't tell them apart to cache them and build them every time.
+ * Keeping them costs nothing extra. BYOND holds onto every icon in the resource cache for the rest of the round anyway, and stores identical ones once.
+ * Icons made at runtime all read as "" when turned into text. We can't tell them apart in the cache, so we build their cuts every time.
  *
  * Arguments:
  * * cut_row - the first pixel row to clear, 1 to 31. Everything below it stays
  */
 /datum/beam/proc/get_terminal_icon_cut_at(cut_row)
+	PRIVATE_PROC(TRUE)
 	var/icon_file_key = (isfile(icon) && istext(icon_state)) ? "[icon]" : null
 	var/list/terminal_icons_for_state = null
 	if(icon_file_key)
@@ -664,40 +631,70 @@
 	terminal_icons_for_state[cut_row] = cropped_icon
 	return cropped_icon
 
-/// Returns the shared glows list for our look and plane offset, or null if our icon can't be a text key (runtime icons all turn into "")
-/datum/beam/proc/get_shared_glows_for_look()
+/// Returns the shared emissives list for our emissive setup, or null if our icon can't be a text key (runtime icons all turn into "")
+/datum/beam/proc/get_shared_emissives_for_setup()
+	PRIVATE_PROC(TRUE)
 	var/icon_file_key = (isfile(icon) && istext(icon_state)) ? "[icon]" : null
 	if(!icon_file_key)
 		return null
-	var/glows_look_key = "[icon_file_key]|[icon_state]|[emissive]|[alpha]|[emissive_alpha]|[shared_glows_plane_offset]"
-	var/list/glows_for_look = LAZYACCESS(shared_glows_by_look, glows_look_key)
-	if(!glows_for_look)
-		glows_for_look = new /list(BEAM_FULL_SEGMENT_GLOW_INDEX)
-		LAZYSET(shared_glows_by_look, glows_look_key, glows_for_look)
-	return glows_for_look
+	var/emissives_setup_key = "[icon_file_key]|[icon_state]|[emissive]|[alpha]|[emissive_alpha]|[shared_emissives_plane_offset]"
+	var/list/emissives_for_setup = LAZYACCESS(shared_emissives_by_setup, emissives_setup_key)
+	if(!emissives_for_setup)
+		emissives_for_setup = new /list(BEAM_FULL_SEGMENT_EMISSIVE_INDEX)
+		LAZYSET(shared_emissives_by_setup, emissives_setup_key, emissives_for_setup)
+	return emissives_for_setup
 
-/// Saves our new visuals' appearance as our look's, so finished beams with our look can leave their visuals behind for the next one (see Destroy())
-/datum/beam/proc/add_look_for_spare_visuals()
-	if(length(spare_visuals_by_look) >= BEAM_MAX_LOOKS_WITH_SPARE_VISUALS)
-		// Player-picked and random colors could make endless looks, so the oldest look and its spares get dropped
-		var/list/oldest_look_spares = spare_visuals_by_look[spare_visuals_by_look[1]]
-		for(var/spare_index in 2 to length(oldest_look_spares))
-			qdel(oldest_look_spares[spare_index])
-		spare_visuals_by_look.Cut(1, 2)
-	LAZYSET(spare_visuals_by_look, visuals_look_key, list(visuals.appearance))
+/// Saves our new visuals' appearance as the appearance for our visuals setup. Finished beams with our setup can then leave their visuals behind for the next one (see Destroy())
+/datum/beam/proc/add_setup_for_spare_visuals()
+	PRIVATE_PROC(TRUE)
+	if(length(spare_visuals_by_setup) >= BEAM_MAX_SETUPS_WITH_SPARE_VISUALS)
+		// Player-picked and random colors can make endless setups, so the oldest setup and its spares get dropped
+		var/list/oldest_appearance_and_spares = spare_visuals_by_setup[spare_visuals_by_setup[1]]
+		for(var/spare_index in 2 to length(oldest_appearance_and_spares))
+			qdel(oldest_appearance_and_spares[spare_index])
+		spare_visuals_by_setup.Cut(1, 2)
+	LAZYSET(spare_visuals_by_setup, visuals_setup_key, list(visuals.appearance))
 
 /**
- * Builds one of our shared glows, the emissive overlay every segment of our look shares
+ * Returns whether our visuals can become a spare for the next beam with our visuals setup
+ *
+ * Read visuals straight from the var, NEVER through a local copy. A local adds a reference, so refcount() never reads 1 and no visuals ever become spares.
  *
  * Arguments:
- * * segment - a segment from this Draw() on our z-level. Its location picks the glow's layer and plane offset, its alpha picks how strong it is
- * * glow_index - the last segment's cut row, or BEAM_FULL_SEGMENT_GLOW_INDEX for full ones
+ * * appearance_and_spares - our setup's list in spare_visuals_by_setup (its saved appearance, then the spares), null if our setup doesn't keep spares
+ */
+/datum/beam/proc/can_leave_visuals_behind(list/appearance_and_spares)
+	PRIVATE_PROC(TRUE)
+	// Our setup doesn't keep spares (see Start()), or the visuals are already gone
+	if(!appearance_and_spares || QDELETED(visuals))
+		return FALSE
+	// Index 1 is the setup's appearance, so this allows BEAM_MAX_SPARE_VISUALS_PER_SETUP spares
+	if(length(appearance_and_spares) > BEAM_MAX_SPARE_VISUALS_PER_SETUP)
+		return FALSE
+	// Something else still holds them. If they become spares, that holder ends up with the next beam's visuals
+	if(refcount(visuals) > 1 || visuals.weak_reference || visuals.tag)
+		return FALSE
+	// They changed after we saved our setup's appearance
+	if(visuals.appearance != appearance_and_spares[1])
+		return FALSE
+	// Or they changed in ways the appearance check can't see
+	if(length(visuals.vis_contents) || visuals._status_traits || visuals.owner || (visuals.datum_flags & DF_VAR_EDITED))
+		return FALSE
+	return TRUE
+
+/**
+ * Builds one of our shared emissives, the emissive overlay every segment with our emissive setup shares
+ *
+ * Arguments:
+ * * segment - a segment from this Draw() on our z-level. Its location picks the emissive's layer and plane offset, its alpha picks how strong it is
+ * * emissive_index - the last segment's cut row, or BEAM_FULL_SEGMENT_EMISSIVE_INDEX for full ones
  * * terminal_icon - the last segment's cut-short icon, null for full ones
  */
-/datum/beam/proc/build_shared_glow(obj/effect/ebeam/segment, glow_index, terminal_icon)
-	var/mutable_appearance/shared_glow = emissive_appearance(terminal_icon ? terminal_icon : icon, terminal_icon ? "" : icon_state, segment, alpha = segment.alpha * emissive_alpha / 255, effect_type = emissive)
-	shared_glows[glow_index] = shared_glow
-	return shared_glow
+/datum/beam/proc/build_shared_emissive(obj/effect/ebeam/segment, emissive_index, terminal_icon)
+	PRIVATE_PROC(TRUE)
+	var/mutable_appearance/shared_emissive = emissive_appearance(terminal_icon ? terminal_icon : icon, terminal_icon ? "" : icon_state, segment, alpha = segment.alpha * emissive_alpha / 255, effect_type = emissive)
+	shared_emissives[emissive_index] = shared_emissive
+	return shared_emissive
 
 /datum/beam/proc/set_up_effect(obj/effect/ebeam/beam_effect, effect_icon_state)
 	beam_effect.icon = icon
@@ -715,6 +712,8 @@
 
 //for when you don't want each segment to look identital
 /datum/beam/varied
+	// Every segment rolls its own icon state, so we don't reuse old ones
+	allowed_reuse_flags = BEAM_REUSE_SHARED_EMISSIVES | BEAM_REUSE_SPARE_VISUALS
 	//how many variants do we have in addition to the unnumbered state we use as a base icon state and terminal segment
 	var/icon_state_variants = 1
 
@@ -754,8 +753,10 @@
 	blocks_emissive = EMISSIVE_BLOCK_NONE
 	var/emissive = TRUE
 	var/datum/beam/owner
-	///The shared glow we're showing, if our beam uses shared glows (see /datum/beam/var/shared_glows)
-	var/mutable_appearance/shared_glow
+	///The shared emissive we're showing, if our beam uses shared emissives (see /datum/beam/var/shared_emissives)
+	var/mutable_appearance/shared_emissive
+	///Which BEAM_REUSE_* flags beams made of us can use. Subtypes inherit it, so drop what yours can't take (see the BEAM_REUSE_* defines in [code/__DEFINES/beam.dm])
+	var/allowed_reuse_flags = BEAM_REUSE_ALL
 
 /obj/effect/ebeam/Initialize(mapload, beam_owner)
 	owner = beam_owner
@@ -776,6 +777,8 @@
 
 /// A beam subtype used for advanced beams, to react to atoms entering the beam
 /obj/effect/ebeam/reacting
+	// A reused segment doesn't react to being placed again, and connect_loc holds on to our visuals so they never become spares. Subtypes can opt back in where it's safe for them
+	allowed_reuse_flags = NONE
 	/// If TRUE, atoms that exist in the beam's loc when inited count as "entering" the beam
 	var/react_on_init = FALSE
 
@@ -835,6 +838,7 @@
 
 /// For beams that might be from a held item.
 /datum/beam/held
+	allowed_reuse_flags = BEAM_REUSE_OLD_SEGMENTS | BEAM_REUSE_SPARE_VISUALS
 	// Is the fishing rod held in left side hand
 	var/lefthand = FALSE
 
@@ -937,10 +941,6 @@
 	INVOKE_ASYNC(newbeam, TYPE_PROC_REF(/datum/beam/, Start))
 	return newbeam
 
-#undef BEAM_FULL_SEGMENT_GLOW_INDEX
-#undef BEAM_MAX_LOOKS_WITH_SPARE_VISUALS
-#undef BEAM_MAX_SPARE_VISUALS_PER_LOOK
-#undef BEAM_REUSE_SHARED_GLOWS
-#undef BEAM_REUSE_OLD_SEGMENTS
-#undef BEAM_REUSE_SPARE_VISUALS
-#undef BEAM_REUSE_ALL
+#undef BEAM_FULL_SEGMENT_EMISSIVE_INDEX
+#undef BEAM_MAX_SETUPS_WITH_SPARE_VISUALS
+#undef BEAM_MAX_SPARE_VISUALS_PER_SETUP

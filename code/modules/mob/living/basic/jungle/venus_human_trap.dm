@@ -97,6 +97,8 @@
 	name = "thick vine"
 	mouse_opacity = MOUSE_OPACITY_ICON
 	desc = "A thick vine, painful to the touch."
+	// Reused vine segments still hurt whoever steps on them. connect_loc holds on to our visuals, so they never become spares
+	allowed_reuse_flags = BEAM_REUSE_SHARED_EMISSIVES | BEAM_REUSE_OLD_SEGMENTS
 
 /obj/effect/ebeam/vine/Initialize(mapload)
 	. = ..()
