@@ -168,18 +168,19 @@
 /obj/item/restraints/legcuffs/goliath_tentacle/proc/leash_target(mob/living/user)
 	leash = user.AddComponent(/datum/component/leash, owner = get_turf(user), distance = 1, silent = TRUE)
 	beam_effect = user.Beam(get_turf(user), "goliath_tentacle", beam_type = /obj/effect/ebeam/goliath, emissive = NONE)
-	RegisterSignal(beam_effect.visuals, COMSIG_CLICK, PROC_REF(on_beam_click))
+	beam_effect.relay_clicks()
+	RegisterSignal(beam_effect, COMSIG_BEAM_CLICKED, PROC_REF(on_beam_click))
 	RegisterSignals(user, list(SIGNAL_ADDTRAIT(TRAIT_TENTACLE_IMMUNE), COMSIG_BRIMDUST_EXPLOSION), PROC_REF(release))
 	RegisterSignals(tentacle, list(COMSIG_QDELETING, COMSIG_GOLIATH_TENTACLE_RETRACTING), PROC_REF(on_tentacle_left))
 	if (tentacle.owner)
 		RegisterSignal(tentacle.owner, COMSIG_MOB_STATCHANGE, PROC_REF(on_tentacle_left))
 	RegisterSignal(leash, COMSIG_QDELETING, PROC_REF(release))
 
-/obj/item/restraints/legcuffs/goliath_tentacle/proc/on_beam_click(atom/source, atom/location, control, params, mob/user)
+/obj/item/restraints/legcuffs/goliath_tentacle/proc/on_beam_click(datum/beam/source, atom/location, control, params, mob/user)
 	SIGNAL_HANDLER
 	INVOKE_ASYNC(src, PROC_REF(process_beam_click), source, location, params, user)
 
-/obj/item/restraints/legcuffs/goliath_tentacle/proc/process_beam_click(atom/source, atom/location, params, mob/user)
+/obj/item/restraints/legcuffs/goliath_tentacle/proc/process_beam_click(datum/beam/source, atom/location, params, mob/user)
 	if(world.time <= user.next_move)
 		return
 
@@ -229,7 +230,8 @@
 		return ..()
 	leash = user.AddComponent(/datum/component/leash, owner = tentacle.owner, distance = get_dist(user, tentacle.owner), silent = TRUE)
 	beam_effect = user.Beam(tentacle.owner, "goliath_tentacle", beam_type = /obj/effect/ebeam/goliath, emissive = NONE)
-	RegisterSignal(beam_effect.visuals, COMSIG_CLICK, PROC_REF(on_beam_click))
+	beam_effect.relay_clicks()
+	RegisterSignal(beam_effect, COMSIG_BEAM_CLICKED, PROC_REF(on_beam_click))
 	RegisterSignals(user, list(SIGNAL_ADDTRAIT(TRAIT_TENTACLE_IMMUNE), COMSIG_BRIMDUST_EXPLOSION), PROC_REF(release))
 	RegisterSignals(tentacle.owner, list(COMSIG_QDELETING, COMSIG_MOB_STATCHANGE), PROC_REF(on_tentacle_left))
 	RegisterSignal(leash, COMSIG_QDELETING, PROC_REF(release))

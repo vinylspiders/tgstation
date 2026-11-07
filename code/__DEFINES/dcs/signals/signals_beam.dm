@@ -10,3 +10,6 @@
 
 /// Sent to a beam when any turf the beam covers changes: (list/datum/callback/post_change_callbacks)
 #define COMSIG_BEAM_TURFS_CHANGED "beam_turfs_changed"
+
+/// Sent to a beam whose visuals are clicked, if it asked for it with relay_clicks(): (atom/location, control, params, mob/user)
+#define COMSIG_BEAM_CLICKED "beam_clicked"

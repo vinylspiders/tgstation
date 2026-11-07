@@ -45,16 +45,16 @@
 		QDEL_NULL(arm)
 	if((movement_type & PHASING))
 		playsound(src, 'sound/effects/curse/curse3.ogg', 25, TRUE, -1)
-	var/turf/T = get_step(src, dir)
-	var/obj/effect/temp_visual/dir_setting/curse/hand/leftover = new(T, dir)
+	var/turf/landing_turf = get_step(src, dir)
+	var/obj/effect/temp_visual/dir_setting/curse/hand/leftover = new(landing_turf, dir)
 	leftover.icon_state = icon_state
-	for(var/obj/effect/temp_visual/dir_setting/curse/grasp_portal/G in starting)
-		qdel(G)
-	if(!T) //T can be in nullspace when src is set to QDEL
+	for(var/obj/effect/temp_visual/dir_setting/curse/grasp_portal/portal in starting)
+		qdel(portal)
+	if(!landing_turf) //the turf can be in nullspace when src is set to QDEL
 		return
 	new /obj/effect/temp_visual/dir_setting/curse/grasp_portal/fading(starting, dir)
-	var/datum/beam/D = starting.Beam(T, icon_state = "curse[handedness]", time = 32, beam_type=/obj/effect/ebeam/curse_arm)
-	animate(D.visuals, alpha = 0, time = 32)
+	var/datum/beam/arm_beam = starting.Beam(landing_turf, icon_state = "curse[handedness]", time = 32, beam_type=/obj/effect/ebeam/curse_arm)
+	arm_beam.fade_out(3.2 SECONDS)
 
 /obj/projectile/curse_hand/on_range()
 	finale()

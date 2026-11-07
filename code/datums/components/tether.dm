@@ -57,9 +57,10 @@
 	RegisterSignal(tether_target, COMSIG_MOVABLE_PRE_MOVE, PROC_REF(check_tether))
 	RegisterSignal(tether_target, COMSIG_MOVABLE_MOVED, PROC_REF(check_snap))
 	RegisterSignal(tether_target, COMSIG_QDELETING, PROC_REF(on_delete))
-	RegisterSignal(tether_beam.visuals, COMSIG_CLICK, PROC_REF(beam_click))
+	tether_beam.relay_clicks()
+	RegisterSignal(tether_beam, COMSIG_BEAM_CLICKED, PROC_REF(beam_click))
 	// Also snap if the beam gets deleted, more of a backup check than anything
-	RegisterSignal(tether_beam.visuals, COMSIG_QDELETING, PROC_REF(on_delete))
+	RegisterSignal(tether_beam, COMSIG_QDELETING, PROC_REF(on_delete))
 
 	if (!isnull(embed_target))
 		RegisterSignal(embed_target, COMSIG_ITEM_UNEMBEDDED, PROC_REF(on_embedded_removed))
@@ -74,7 +75,7 @@
 	if (!isnull(tether_trait_source))
 		REMOVE_TRAIT(parent, TRAIT_TETHER_ATTACHED, tether_trait_source)
 	if (!QDELETED(tether_beam))
-		UnregisterSignal(tether_beam.visuals, list(COMSIG_CLICK, COMSIG_QDELETING))
+		UnregisterSignal(tether_beam, list(COMSIG_BEAM_CLICKED, COMSIG_QDELETING))
 		qdel(tether_beam)
 	if (!QDELETED(embed_target))
 		UnregisterSignal(embed_target, list(COMSIG_ITEM_UNEMBEDDED, COMSIG_QDELETING))
@@ -271,12 +272,12 @@
 	parent.AddComponent(/datum/component/tether, source, max_dist, tether_name, cur_dist)
 	qdel(src)
 
-/datum/component/tether/proc/beam_click(atom/source, atom/location, control, params, mob/user)
+/datum/component/tether/proc/beam_click(datum/beam/source, atom/location, control, params, mob/user)
 	SIGNAL_HANDLER
 
 	INVOKE_ASYNC(src, PROC_REF(process_beam_click), source, location, params, user)
 
-/datum/component/tether/proc/process_beam_click(atom/source, atom/location, params, mob/user)
+/datum/component/tether/proc/process_beam_click(datum/beam/source, atom/location, params, mob/user)
 	var/turf/nearest_turf
 	for (var/turf/line_turf in get_line(get_turf(parent), get_turf(tether_target)))
 		if (line_turf.IsReachableBy(user))

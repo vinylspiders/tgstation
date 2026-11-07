@@ -188,7 +188,7 @@
 	beam_target = _beam_target
 	if(beam_target)
 		var/datum/beam/beam = Beam(beam_target, "plasmabeam", beam_type=/obj/effect/ebeam/plasma_fist, time = 3 SECONDS)
-		animate(beam.visuals, alpha = 0, time = 3 SECONDS)
+		beam.fade_out(3 SECONDS)
 	animate(src, alpha = 0, transform = matrix()*0.5, time = 3 SECONDS)
 
 /obj/effect/temp_visual/plasma_soul/Destroy()

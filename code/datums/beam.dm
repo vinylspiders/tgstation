@@ -1,9 +1,9 @@
 /// Shared emissives list index for full-length segments. 1 to 31 are for the last segment, one for each length it can be cut to
 #define BEAM_FULL_SEGMENT_EMISSIVE_INDEX 32
-/// Max number of different visuals setups we keep spare visuals for
-#define BEAM_MAX_SETUPS_WITH_SPARE_VISUALS 64
-/// Max spare visuals we keep per visuals setup
-#define BEAM_MAX_SPARE_VISUALS_PER_SETUP 4
+/// Max visuals setups we keep a pool for
+#define BEAM_MAX_SETUPS_WITH_POOLED_VISUALS 64
+/// Max visuals we pool per setup
+#define BEAM_MAX_POOLED_VISUALS_PER_SETUP 4
 
 /** # Beam Datum and Effect
  * **IF YOU ARE LAZY AND DO NOT WANT TO READ, GO TO THE BOTTOM OF THE FILE AND USE THAT PROC!**
@@ -37,11 +37,16 @@
 	///the objects placed in the elements list
 	var/beam_type = /obj/effect/ebeam
 	///This is used as the visual_contents of beams, so you can apply one effect to this and the whole beam will look like that. never gets deleted on redrawing.
-	var/obj/effect/ebeam/visuals
-	///Key for our visuals setup (the segment type and the vars set_up_effect() sets): "[beam_type]|[icon]|[icon_state]|[beam_color]|[emissive]|[beam_layer]". Only set if our visuals can go to the next beam with the same setup
+	///Private: they go to the next beam with our setup (see Destroy()), so a holder would end up showing that beam
+	VAR_PRIVATE/obj/effect/ebeam/visuals
+	///TRUE once fade_out() changed our visuals, so they can't be pooled
+	VAR_PRIVATE/visuals_changed = FALSE
+	///TRUE while relay_clicks() has us registered on our visuals (see Destroy())
+	VAR_PRIVATE/relaying_clicks = FALSE
+	///Key for our visuals setup: the segment type and the vars set_up_effect() sets. Null if we can't pool
 	VAR_PRIVATE/visuals_setup_key
-	///Visuals that finished beams left behind for the next beam with the same visuals setup. setup key -> list(the setup's appearance, then the spares)
-	VAR_PRIVATE/static/list/spare_visuals_by_setup
+	///Pooled visuals, setup key -> list(the setup's appearance, then the visuals)
+	VAR_PRIVATE/static/list/pooled_visuals_by_setup
 	///The color of the beam we're drawing.
 	var/beam_color
 	///If we use an emissive appearance, and if so, what type?
@@ -98,7 +103,7 @@
 	VAR_PRIVATE/shared_emissives_plane_offset
 	///All the shared emissives lists, by emissive setup "[icon]|[icon_state]|[emissive]|[alpha]|[emissive_alpha]|[plane offset]"
 	VAR_PRIVATE/static/list/shared_emissives_by_setup
-	///Which BEAM_REUSE_* flags beams of our type can use. Subtypes inherit it, so drop what yours can't take (see the BEAM_REUSE_* defines in [code/__DEFINES/beam.dm]). We only use a flag our segment type allows too
+	///Which BEAM_REUSE_* flags beams of our type can use. Subtypes inherit it, so drop what yours can't take (see the BEAM_REUSE_* defines in [code/__DEFINES/beam.dm])
 	var/allowed_reuse_flags = BEAM_REUSE_ALL
 	///Which BEAM_REUSE_* flags we use, worked out in Start() from our beam type and segment type
 	VAR_PRIVATE/reuse_flags = NONE
@@ -145,30 +150,29 @@
  * Proc called by the atom Beam() proc. Sets up signals, and draws the beam for the first time.
  */
 /datum/beam/proc/Start()
-	// We only use what both our type and our segment type allow
 	var/obj/effect/ebeam/segment_type = beam_type
 	reuse_flags = allowed_reuse_flags & initial(segment_type.allowed_reuse_flags)
-	// Take visuals a finished beam with our visuals setup left behind (see Destroy()). Runtime icons and color matrices can't go in a text key, so those beams make their own
-	if((reuse_flags & BEAM_REUSE_SPARE_VISUALS) && isfile(icon) && istext(icon_state) && (isnull(beam_color) || istext(beam_color)))
-		// The segment type is in the key so visuals only go to beams made of the same segment type. The layer gets 9 digits because "[beam_layer]" only keeps 6, and with 6 two close layers can get the same key
+	// Take a pooled visuals from a finished beam with our setup (see Destroy()). Runtime icons and color matrices interpolate alike, so beams using them make their own
+	if((reuse_flags & BEAM_REUSE_POOLED_VISUALS) && isfile(icon) && istext(icon_state) && (isnull(beam_color) || istext(beam_color)))
+		// The segment type is in the key, so visuals only go to beams made of the same one. The layer gets 9 digits because "[beam_layer]" keeps 6, and two close layers can then share a key
 		visuals_setup_key = "[beam_type]|[icon]|[icon_state]|[beam_color]|[emissive]|[num2text(beam_layer, 9)]"
-		var/list/appearance_and_spares = LAZYACCESS(spare_visuals_by_setup, visuals_setup_key)
-		var/obj/effect/ebeam/taken_spare_visuals = null
-		// Index 1 is the setup's appearance and the spares come after
-		for(var/spare_index in length(appearance_and_spares) to 2 step -1)
-			taken_spare_visuals = appearance_and_spares[spare_index]
-			appearance_and_spares.Cut(spare_index)
+		var/list/appearance_and_pool = LAZYACCESS(pooled_visuals_by_setup, visuals_setup_key)
+		var/obj/effect/ebeam/taken_visuals = null
+		// Index 1 is the setup's appearance, the pooled visuals come after
+		for(var/pooled_index in length(appearance_and_pool) to 2 step -1)
+			taken_visuals = appearance_and_pool[pooled_index]
+			appearance_and_pool.Cut(pooled_index)
 			// Something else can delete it while it waits
-			if(!QDELETED(taken_spare_visuals))
+			if(!QDELETED(taken_visuals))
 				break
-			taken_spare_visuals = null
-		if(taken_spare_visuals)
-			visuals = taken_spare_visuals
+			taken_visuals = null
+		if(taken_visuals)
+			visuals = taken_visuals
 		else
 			visuals = new beam_type()
 			set_up_effect(visuals, icon_state)
-			if(!appearance_and_spares)
-				add_setup_for_spare_visuals()
+			if(!appearance_and_pool)
+				add_setup_to_visuals_pool()
 	else
 		visuals = new beam_type()
 		set_up_effect(visuals, icon_state)
@@ -244,11 +248,14 @@
 
 /datum/beam/Destroy()
 	QDEL_LIST(elements)
-	var/list/appearance_and_spares = visuals_setup_key ? LAZYACCESS(spare_visuals_by_setup, visuals_setup_key) : null
-	if(can_leave_visuals_behind(appearance_and_spares))
-		// Stop any animation on them
-		animate(visuals)
-		appearance_and_spares += visuals
+	// Our own relay holds them too, and the refcount below has to read 1
+	if(relaying_clicks)
+		UnregisterSignal(visuals, COMSIG_CLICK)
+	var/list/appearance_and_pool = visuals_setup_key ? LAZYACCESS(pooled_visuals_by_setup, visuals_setup_key) : null
+	// Index 1 is the setup's appearance, so this leaves room for BEAM_MAX_POOLED_VISUALS_PER_SETUP
+	// Read visuals straight from the var: a local copy adds a reference and refcount() never reads 1
+	if(appearance_and_pool && length(appearance_and_pool) <= BEAM_MAX_POOLED_VISUALS_PER_SETUP && !QDELETED(visuals) && refcount(visuals) == 1 && !visuals_changed && !(visuals.datum_flags & DF_VAR_EDITED))
+		appearance_and_pool += visuals
 		visuals = null
 	else
 		QDEL_NULL(visuals)
@@ -257,6 +264,35 @@
 	target = null
 	origin = null
 	return ..()
+
+/**
+ * Relays clicks on our visuals to us as COMSIG_BEAM_CLICKED, so callers never need our visuals
+ *
+ * Off unless asked for: most beams are never clicked, and a registration per beam isn't free
+ */
+/datum/beam/proc/relay_clicks()
+	if(QDELETED(visuals) || relaying_clicks)
+		return
+	relaying_clicks = TRUE
+	RegisterSignal(visuals, COMSIG_CLICK, PROC_REF(on_visuals_clicked))
+
+/datum/beam/proc/on_visuals_clicked(atom/source, atom/location, control, params, mob/user)
+	SIGNAL_HANDLER
+	PRIVATE_PROC(TRUE)
+	SEND_SIGNAL(src, COMSIG_BEAM_CLICKED, location, control, params, user)
+
+/**
+ * Fades our visuals out, for beams that end by disappearing rather than being cut off
+ *
+ * Arguments:
+ * * time - how long the fade takes, in deciseconds
+ */
+/datum/beam/proc/fade_out(time)
+	if(QDELETED(visuals))
+		return
+	// Pooling needs the visuals we set up, and a faded one isn't (see Destroy())
+	visuals_changed = TRUE
+	animate(visuals, alpha = 0, time = time)
 
 // These are macros instead of procs to save a proc call per segment, since Draw() runs a lot
 
@@ -398,7 +434,7 @@
 	var/old_count = length(old_elements)
 	// TRUE at the index of each old segment we're reusing
 	var/list/reused_old_segment_indexes
-	// If our types allow it, reuse an old segment when a new one lands on its turf. Otherwise we make every segment new
+	// If our types allow it, reuse an old segment when a new one lands on its turf
 	if(old_count && (reuse_flags & BEAM_REUSE_OLD_SEGMENTS))
 		var/reusable_old_segment_count = old_count
 		// If the beam got shorter, its old tail fades out further down. Only reuse segments the new beam still covers, so the tail is left to fade
@@ -481,7 +517,7 @@
 			else if(emissive)
 				BEAM_GIVE_SEGMENT_ITS_OWN_EMISSIVE()
 	else
-		// Nothing to reuse (first Draw(), or a beam that doesn't reuse segments), so every segment is new and we skip the reuse logic
+		// Nothing to reuse (first Draw(), or a beam that doesn't reuse segments), so every segment is new
 		for(var/segment_start in 0 to beam_length - 1 step 32)
 			if(QDELETED(src))
 				break
@@ -593,7 +629,7 @@
  * To stop that, we copy our sprite and clear every pixel row from cut_row up. Then we fade out the few rows just below the cut, so the end isn't a hard line.
  *
  * That's a fair bit of icon work, so for sprites loaded from a file we only build each cut once and keep it in cached_terminal_icons.
- * Keeping them costs nothing extra. BYOND holds onto every icon in the resource cache for the rest of the round anyway, and stores identical ones once.
+ * Keeping them costs nothing extra: BYOND holds every icon in the resource cache for the rest of the round anyway, and stores identical ones once.
  * Icons made at runtime all read as "" when turned into text. We can't tell them apart in the cache, so we build their cuts every time.
  *
  * Arguments:
@@ -609,7 +645,6 @@
 			return terminal_icons_for_state[cut_row]
 	var/icon/terminal_icon = new(icon, icon_state)
 	terminal_icon.DrawBox(null, 1, cut_row, 32, 32)
-	// Soft alpha falloff so the tip isn't a hard line.
 	var/fade_height = min(4, cut_row - 1)
 	if(fade_height > 0)
 		var/icon/alpha_mask = new(icon, icon_state)
@@ -644,43 +679,16 @@
 		LAZYSET(shared_emissives_by_setup, emissives_setup_key, emissives_for_setup)
 	return emissives_for_setup
 
-/// Saves our new visuals' appearance as the appearance for our visuals setup. Finished beams with our setup can then leave their visuals behind for the next one (see Destroy())
-/datum/beam/proc/add_setup_for_spare_visuals()
+/// Saves our new visuals' appearance as our setup's, so finished beams with our setup can pool theirs (see Destroy())
+/datum/beam/proc/add_setup_to_visuals_pool()
 	PRIVATE_PROC(TRUE)
-	if(length(spare_visuals_by_setup) >= BEAM_MAX_SETUPS_WITH_SPARE_VISUALS)
-		// Player-picked and random colors can make endless setups, so the oldest setup and its spares get dropped
-		var/list/oldest_appearance_and_spares = spare_visuals_by_setup[spare_visuals_by_setup[1]]
-		for(var/spare_index in 2 to length(oldest_appearance_and_spares))
-			qdel(oldest_appearance_and_spares[spare_index])
-		spare_visuals_by_setup.Cut(1, 2)
-	LAZYSET(spare_visuals_by_setup, visuals_setup_key, list(visuals.appearance))
-
-/**
- * Returns whether our visuals can become a spare for the next beam with our visuals setup
- *
- * Read visuals straight from the var, NEVER through a local copy. A local adds a reference, so refcount() never reads 1 and no visuals ever become spares.
- *
- * Arguments:
- * * appearance_and_spares - our setup's list in spare_visuals_by_setup (its saved appearance, then the spares), null if our setup doesn't keep spares
- */
-/datum/beam/proc/can_leave_visuals_behind(list/appearance_and_spares)
-	PRIVATE_PROC(TRUE)
-	// Our setup doesn't keep spares (see Start()), or the visuals are already gone
-	if(!appearance_and_spares || QDELETED(visuals))
-		return FALSE
-	// Index 1 is the setup's appearance, so this allows BEAM_MAX_SPARE_VISUALS_PER_SETUP spares
-	if(length(appearance_and_spares) > BEAM_MAX_SPARE_VISUALS_PER_SETUP)
-		return FALSE
-	// Something else still holds them. If they become spares, that holder ends up with the next beam's visuals
-	if(refcount(visuals) > 1 || visuals.weak_reference || visuals.tag)
-		return FALSE
-	// They changed after we saved our setup's appearance
-	if(visuals.appearance != appearance_and_spares[1])
-		return FALSE
-	// Or they changed in ways the appearance check can't see
-	if(length(visuals.vis_contents) || visuals._status_traits || visuals.owner || (visuals.datum_flags & DF_VAR_EDITED))
-		return FALSE
-	return TRUE
+	if(length(pooled_visuals_by_setup) >= BEAM_MAX_SETUPS_WITH_POOLED_VISUALS)
+		// Player-picked and random colors can make endless setups, so the oldest setup and its pool get dropped
+		var/list/oldest_appearance_and_pool = pooled_visuals_by_setup[pooled_visuals_by_setup[1]]
+		for(var/pooled_index in 2 to length(oldest_appearance_and_pool))
+			qdel(oldest_appearance_and_pool[pooled_index])
+		pooled_visuals_by_setup.Cut(1, 2)
+	LAZYSET(pooled_visuals_by_setup, visuals_setup_key, list(visuals.appearance))
 
 /**
  * Builds one of our shared emissives, the emissive overlay every segment with our emissive setup shares
@@ -713,7 +721,7 @@
 //for when you don't want each segment to look identital
 /datum/beam/varied
 	// Every segment rolls its own icon state, so we don't reuse old ones
-	allowed_reuse_flags = BEAM_REUSE_SHARED_EMISSIVES | BEAM_REUSE_SPARE_VISUALS
+	allowed_reuse_flags = BEAM_REUSE_SHARED_EMISSIVES | BEAM_REUSE_POOLED_VISUALS
 	//how many variants do we have in addition to the unnumbered state we use as a base icon state and terminal segment
 	var/icon_state_variants = 1
 
@@ -777,7 +785,7 @@
 
 /// A beam subtype used for advanced beams, to react to atoms entering the beam
 /obj/effect/ebeam/reacting
-	// A reused segment doesn't react to being placed again, and connect_loc holds on to our visuals so they never become spares. Subtypes can opt back in where it's safe for them
+	// A reused segment doesn't react to being placed again, and connect_loc holds on to our visuals so they can't be pooled. Subtypes can opt back in where it's safe for them
 	allowed_reuse_flags = NONE
 	/// If TRUE, atoms that exist in the beam's loc when inited count as "entering" the beam
 	var/react_on_init = FALSE
@@ -838,7 +846,7 @@
 
 /// For beams that might be from a held item.
 /datum/beam/held
-	allowed_reuse_flags = BEAM_REUSE_OLD_SEGMENTS | BEAM_REUSE_SPARE_VISUALS
+	allowed_reuse_flags = BEAM_REUSE_OLD_SEGMENTS | BEAM_REUSE_POOLED_VISUALS
 	// Is the fishing rod held in left side hand
 	var/lefthand = FALSE
 
@@ -942,5 +950,5 @@
 	return newbeam
 
 #undef BEAM_FULL_SEGMENT_EMISSIVE_INDEX
-#undef BEAM_MAX_SETUPS_WITH_SPARE_VISUALS
-#undef BEAM_MAX_SPARE_VISUALS_PER_SETUP
+#undef BEAM_MAX_SETUPS_WITH_POOLED_VISUALS
+#undef BEAM_MAX_POOLED_VISUALS_PER_SETUP
